@@ -16,12 +16,12 @@ class ScheduleController extends Controller
 
     public function showScheduleForm()
     {
-        return view('schedule.form'); // Страница с формой выбора группы
+        return view('schedule.form'); 
     }
 
     public function getScheduleForGroup(Request $request)
     {
-        $groupName = $request->input('group'); // 
+        $groupName = $request->input('group'); 
         $schedule = $this->scheduleParser->getTodaySchedule($groupName);
 
         return view('schedule.display', ['schedule' => $schedule, 'groupName' => $groupName]);
