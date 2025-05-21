@@ -24,11 +24,11 @@ class ScheduleParserService
          3 => '2 знаменатель',
     ];
 
-    public function __construct()
+    public function __construct(Client $httpClient = null)
     {
-        $this->httpClient = new Client([
-            'verify'      => $this->cacertPath,
-            'timeout'     => 10.0,
+         $this->httpClient = $httpClient ?? new Client([
+            'verify' => $this->cacertPath, 
+            'timeout' => 10.0,
             'http_errors' => false,
         ]);
     }
