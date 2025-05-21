@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\ScheduleController;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Http\Request;
 
 Route::get('/schedule/{groupName}', [ScheduleController::class, 'showSchedule']);
 Route::get('/free-time/{groupName}', [ScheduleController::class, 'getFreeTime']);

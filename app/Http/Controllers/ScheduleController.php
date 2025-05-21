@@ -34,7 +34,7 @@ class ScheduleController extends Controller
             return response()->json(
                 ['message' => 'Не удалось определить текущую неделю. 
                 Возможно, семестр еще не начался или произошла ошибка.'],
-                500
+                500,
             );
         }
 
@@ -48,8 +48,8 @@ class ScheduleController extends Controller
         $weekTypesMap = $this->scheduleParserService->getWeekTypesMap();
 
         if (empty($scheduleData)) {
-             Log::warning("Расписание для группы {$groupName} не найдено или произошла ошибка.");
-             return response()->json(['message' => 'Расписание не найдено для группы ' . $groupName], 404);
+            Log::warning("Расписание для группы {$groupName} не найдено или произошла ошибка.");
+            return response()->json(['message' => 'Расписание не найдено для группы ' . $groupName], 404);
         }
 
         $formattedSchedule = [];
@@ -62,15 +62,15 @@ class ScheduleController extends Controller
                 foreach ($scheduleData[$dayNumber] as $weekTypeIndex => $lessons) {
                     // Получаем имя типа недели по индексу
                     if (isset($weekTypesMap[$weekTypeIndex])) {
-                         $weekTypeName = $weekTypesMap[$weekTypeIndex];
-                         $formattedSchedule[$dayName][$weekTypeName] = array_map(function ($lesson) {
-                             unset($lesson['teacher']);
-                             unset($lesson['room']);
-                             return $lesson;
-                         }, $lessons);
+                        $weekTypeName = $weekTypesMap[$weekTypeIndex];
+                        $formattedSchedule[$dayName][$weekTypeName] = array_map(function ($lesson) {
+                            unset($lesson['teacher']);
+                            unset($lesson['room']);
+                            return $lesson;
+                        }, $lessons);
                     } else {
-                         //Log::warning("Обнаружен неизвестный тип недели
-                         // '{$weekTypeIndex}' для дня {$dayNumber}, группы {$groupName}");
+                        //Log::warning("Обнаружен неизвестный тип недели
+                        // '{$weekTypeIndex}' для дня {$dayNumber}, группы {$groupName}");
                     }
                 }
                 if (empty($formattedSchedule[$dayName])) {
@@ -82,19 +82,19 @@ class ScheduleController extends Controller
         return response()->json($formattedSchedule);
     }
 
-     // Рассчитывает и возвращает свободное время для группы в формате JSON.
+    // Рассчитывает и возвращает свободное время для группы в формате JSON.
     public function getFreeTime(string $groupName): JsonResponse
     {
         $scheduleData = $this->scheduleParserService->getWeekSchedule($groupName);
         $weekTypesMap = $this->scheduleParserService->getWeekTypesMap();
 
         if (empty($scheduleData)) {
-             Log::warning("Свободное время: Расписание для группы {$groupName} не найдено.");
-             return response()->json(
-                 ['message' => 'Расписание не найдено для группы ' .
-                 $groupName . ', невозможно рассчитать свободное время.'],
-                 404
-             );
+            Log::warning("Свободное время: Расписание для группы {$groupName} не найдено.");
+            return response()->json(
+                ['message' => 'Расписание не найдено для группы ' .
+                $groupName . ', невозможно рассчитать свободное время.'],
+                404,
+            );
         }
 
         $formattedFreeTime = [];
@@ -103,15 +103,15 @@ class ScheduleController extends Controller
 
         // Итерируемся по дням недели в правильном порядке
         foreach ($this->dayOrder as $dayNumber => $dayName) {
-             $formattedFreeTime[$dayName] = [];
+            $formattedFreeTime[$dayName] = [];
 
-             // Массив для хранения уже обработанных типов недель для данного дня
-             $processedWeekTypes = [];
+            // Массив для хранения уже обработанных типов недель для данного дня
+            $processedWeekTypes = [];
 
             // Сначала обрабатываем дни, где есть занятия
             if (isset($scheduleData[$dayNumber])) {
-                 // Сортируем типы недель по индексу для консистентности вывода
-                 ksort($scheduleData[$dayNumber]);
+                // Сортируем типы недель по индексу для консистентности вывода
+                ksort($scheduleData[$dayNumber]);
                 foreach ($scheduleData[$dayNumber] as $weekTypeIndex => $lessons) {
                     if (isset($weekTypesMap[$weekTypeIndex])) {
                         $weekTypeName = $weekTypesMap[$weekTypeIndex];
@@ -125,8 +125,8 @@ class ScheduleController extends Controller
 
             foreach ($weekTypesMap as $weekTypeIndex => $weekTypeName) {
                 if (!isset($processedWeekTypes[$weekTypeIndex])) {
-                     $freeSlots = $this->scheduleParserService->calculateFreeTimeSlots([], $dayStartTime, $dayEndTime);
-                     $formattedFreeTime[$dayName][$weekTypeName] = $freeSlots;
+                    $freeSlots = $this->scheduleParserService->calculateFreeTimeSlots([], $dayStartTime, $dayEndTime);
+                    $formattedFreeTime[$dayName][$weekTypeName] = $freeSlots;
                 }
             }
         }

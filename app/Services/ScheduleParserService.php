@@ -2,18 +2,20 @@
 
 namespace App\Services;
 
-use GuzzleHttp\Client;
-use Exception;
-use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use Exception;
+use GuzzleHttp\Client;
+use Illuminate\Support\Facades\Log;
 
 class ScheduleParserService
 {
     protected Client $httpClient;
-    protected string $scheduleApiUrl = 'https://www.miet.ru/schedule/data';
-    protected string $cacertPath = 'C:\Users\darin\Downloads\cacert.pem';
-    protected const SEMESTER_START_DATE = '2025-02-03';
 
+    protected string $scheduleApiUrl = 'https://www.miet.ru/schedule/data';
+
+    protected string $cacertPath = 'C:\Users\darin\Downloads\cacert.pem';
+
+    protected const SEMESTER_START_DATE = '2025-02-03';
 
     protected array $weekTypesMap = [
          0 => '1 числитель',
@@ -22,12 +24,11 @@ class ScheduleParserService
          3 => '2 знаменатель',
     ];
 
-
     public function __construct()
     {
         $this->httpClient = new Client([
-            'verify' => $this->cacertPath,
-            'timeout' => 10.0,
+            'verify'      => $this->cacertPath,
+            'timeout'     => 10.0,
             'http_errors' => false,
         ]);
     }
@@ -48,15 +49,15 @@ class ScheduleParserService
             Log::info('Статус HTTP ответа: ' . $statusCode);
 
             if ($statusCode !== 200) {
-                 Log::error("API вернул ошибку {$statusCode} для группы {$groupName}.");
-                 return [];
+                Log::error("API вернул ошибку {$statusCode} для группы {$groupName}.");
+                return [];
             }
 
             $responseBody = $response->getBody()->getContents();
 
             if (empty($responseBody) || !in_array($responseBody[0], ['{', '['])) {
-                 Log::error('Ответ API не является валидным JSON: ' . substr($responseBody, 0, 100) . '...');
-                 return [];
+                Log::error('Ответ API не является валидным JSON: ' . substr($responseBody, 0, 100) . '...');
+                return [];
             }
 
             $data = json_decode($responseBody, true);
@@ -67,11 +68,10 @@ class ScheduleParserService
                 return [];
             }
 
-
             if (!is_array($data) || !isset($data['Data']) || !is_array($data['Data'])) {
                 Log::warning('В ответе API отсутствует ключ "Data" или он не является массивом.');
                 if (isset($data['Error'])) {
-                     Log::warning('API вернуло ошибку: ' . $data['Error']);
+                    Log::warning('API вернуло ошибку: ' . $data['Error']);
                 }
                 return [];
             }
@@ -104,8 +104,8 @@ class ScheduleParserService
                 $timeTo = substr($timeToRaw, 11, 5);
 
                 if (!preg_match('/^\d{2}:\d{2}$/', $timeFrom) || !preg_match('/^\d{2}:\d{2}$/', $timeTo)) {
-                     Log::warning('Некорректный формат времени в записи: ' . print_r($lessonData, true));
-                     continue;
+                    Log::warning('Некорректный формат времени в записи: ' . print_r($lessonData, true));
+                    continue;
                 }
 
                 // Создание вложенных массивов, если их еще нет
@@ -119,10 +119,10 @@ class ScheduleParserService
 
                 $lessonsByDayAndWeekType[$day][$weekTypeIndex][] = [
                     'time_from' => $timeFrom,
-                    'time_to' => $timeTo,
-                    'subject' => $subject,
-                    'room' => $room,
-                    'teacher' => $teacher,
+                    'time_to'   => $timeTo,
+                    'subject'   => $subject,
+                    'room'      => $room,
+                    'teacher'   => $teacher,
                 ];
             }
 
@@ -135,7 +135,7 @@ class ScheduleParserService
                 }
                 unset($lessons);
             }
-             unset($weekTypeLessons);
+            unset($weekTypeLessons);
 
             return $lessonsByDayAndWeekType;
         } catch (Exception $e) {
@@ -143,7 +143,6 @@ class ScheduleParserService
             return [];
         }
     }
-
 
     public function calculateFreeTimeSlots(array $lessons, string $dayStart = '08:00', string $dayEnd = '20:00'): array
     {
@@ -177,7 +176,7 @@ class ScheduleParserService
             // Проверяем, не наступил ли еще семестр
             if ($currentDate->isBefore($startDate)) {
                 Log::warning('Попытка определить тип недели до начала семестра.', [
-                    'current_date' => $currentDate->toDateString(),
+                    'current_date'   => $currentDate->toDateString(),
                     'semester_start' => $startDate->toDateString(),
                 ]);
                 return null;
@@ -196,12 +195,12 @@ class ScheduleParserService
             $weekTypeName = $this->weekTypesMap[$weekTypeIndex] ?? 'Неизвестный тип';
 
             Log::info('Определен тип текущей недели', [
-                'semester_start' => self::SEMESTER_START_DATE,
-                'current_date' => $currentDate->toDateString(),
-                'weeks_passed' => $weeksPassed,
+                'semester_start'       => self::SEMESTER_START_DATE,
+                'current_date'         => $currentDate->toDateString(),
+                'weeks_passed'         => $weeksPassed,
                 'semester_week_number' => $semesterWeekNumber,
-                'week_type_index' => $weekTypeIndex,
-                'week_type_name' => $weekTypeName
+                'week_type_index'      => $weekTypeIndex,
+                'week_type_name'       => $weekTypeName,
             ]);
 
             return [
@@ -211,7 +210,7 @@ class ScheduleParserService
             ];
         } catch (Exception $e) {
             Log::error('Ошибка при расчете текущего типа недели: ' . $e->getMessage(), [
-                'semester_start' => self::SEMESTER_START_DATE
+                'semester_start' => self::SEMESTER_START_DATE,
             ]);
             return null;
         }

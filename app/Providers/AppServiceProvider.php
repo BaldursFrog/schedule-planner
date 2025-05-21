@@ -3,7 +3,6 @@
 namespace App\Providers;
 
 use App\Services\ScheduleParserService;
-use App\Services\ScheduleService;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
