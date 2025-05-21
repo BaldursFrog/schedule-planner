@@ -1,0 +1,7 @@
+parameters:
+    paths:
+        - app/
+        - routes/
+    level: 5
+    # excludePaths: ...
+    # ignoreErrors: ...

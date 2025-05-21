@@ -35,4 +35,13 @@ return [
         ],
     ],
 
+    'gigachat' => [
+        'client_id' => env('GIGACHAT_CLIENT_ID'),
+        'client_secret' => env('GIGACHAT_CLIENT_SECRET'),
+    ],
+
+    'miet_schedule' => [
+        'base_url' => env('MIET_SCHEDULE_SERVICE_URL'),
+    ],
+
 ];
