@@ -7,25 +7,26 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
+use Illuminate\Http\JsonResponse;
 
 class TelegramBotController extends Controller
 {
-    private $token;
-    private $client;
-    private $plannerServiceUrl = 'https://1e046903-d28b-444d-bdff-685a9c37343a.tunnel4.com/api';
-    private $activePolls = [];
+    private string $token;
+    private Client $client;
+    private string $plannerServiceUrl = 'https://1e046903-d28b-444d-bdff-685a9c37343a.tunnel4.com/api';
+    private array $activePolls = [];
 
     public function __construct()
     {
         $this->token = env('TELEGRAM_BOT_TOKEN');
         $this->validateToken();
         $this->client = new Client([
-            'timeout' => 100, // Установлено 100 секунд для обработки ответа
+            'timeout' => 100,
             'connect_timeout' => 10,
         ]);
     }
 
-    public function handleWebhook(Request $request)
+    public function handleWebhook(Request $request): JsonResponse
     {
         $input = $request->all();
         Log::info('Входящий вебхук Telegram:', $input);
@@ -69,11 +70,12 @@ class TelegramBotController extends Controller
             case '/help':
                 return $this->getHelpMessage();
             
-            case '/schedule':
-                return "🕒 Расписание:\nПн-Пт: 9:00-18:00\nСб: 10:00-14:00";
-            
             case '/plan':
-                return "📋 Текущий план:\n1. Изучение PHP\n2. Практика с Laravel";
+                $userData = $this->getUserData($userId);
+                $goal = $userData['goal'] ?? null;
+                return $goal 
+                    ? "📋 Цель: {$goal}" 
+                    : "❌ Цель не задана. Введите /EnterGoal для указания цели.";
             
             case '/EnterGroup':
                 $this->setUserState($userId, [
@@ -108,17 +110,21 @@ class TelegramBotController extends Controller
         return "🤖 Доступные команды:\n"
             . "/start - Начать работу\n"
             . "/help - Справка\n"
-            . "/schedule - Расписание\n"
-            . "/plan - Текущий план\n"
+            . "/plan - Показать текущую цель\n"
             . "/EnterGroup - Указать группу\n"
             . "/EnterGoal - Указать цель\n"
             . "/GeneratePlan - Создать план\n"
             . "/Cancel - Отменить операцию";
     }
 
+    /**
+     * @param array{step?: string, timestamp?: int, pending_action?: string, missing_data?: string[], current_step?: int} $state
+     */
     private function handleUserState(int $userId, string $text, ?array $state): string
     {
-        if (empty($state)) return "❌ Неизвестная команда";
+        if (empty($state)) {
+            return "❌ Неизвестная команда";
+        }
 
         switch ($state['step']) {
             case 'waiting_for_group':
@@ -153,6 +159,10 @@ class TelegramBotController extends Controller
         return $this->executePlanGeneration($userId, $chatId, $userData);
     }
 
+    /**
+     * @param array{group?: string, goal?: string} $userData
+     * @return string[]
+     */
     private function getMissingData(array $userData): array
     {
         $missing = [];
@@ -161,6 +171,9 @@ class TelegramBotController extends Controller
         return $missing;
     }
 
+    /**
+     * @param string[] $missing
+     */
     private function initiateDataCollection(int $userId, array $missing): string
     {
         $this->setUserState($userId, [
@@ -182,12 +195,11 @@ class TelegramBotController extends Controller
         return $messages[$field] ?? "ℹ️ Введите требуемую информацию:";
     }
 
-    private function handlePlanGenerationDataCollection(
-        int $userId,
-        int $chatId,
-        string $text,
-        array $state
-    ): string {
+    /**
+     * @param array{pending_action: string, missing_data: string[], current_step: int, timestamp: int} $state
+     */
+    private function handlePlanGenerationDataCollection(int $userId, int $chatId, string $text, array $state): string
+    {
         $missing = $state['missing_data'];
         $currentStep = $state['current_step'];
         $currentField = $missing[$currentStep];
@@ -210,9 +222,11 @@ class TelegramBotController extends Controller
         return $this->generateDataRequestMessage($missing[$nextStep]);
     }
 
+    /**
+     * @param array{group: string, goal: string} $userData
+     */
     private function executePlanGeneration(int $userId, int $chatId, array $userData): string
     {
-        // Проверка на существующий job_id для предотвращения дублирования
         $existingJobId = $this->getJobData($userId);
         if ($existingJobId) {
             Log::info("Попытка повторного запуска генерации плана для user {$userId}, job {$existingJobId}. Отклонено.");
@@ -226,7 +240,6 @@ class TelegramBotController extends Controller
                 'group_id' => $userData['group']
             ]);
 
-            // Отправка запроса на внешний сервис
             $response = $this->client->post("{$this->plannerServiceUrl}/generate-plan", [
                 'headers' => [
                     'Content-Type' => 'application/json',
@@ -248,7 +261,6 @@ class TelegramBotController extends Controller
                     return "❌ Ошибка: не получен идентификатор задачи. Попробуйте позже.";
                 }
 
-                // Сохраняем job_id и начинаем опрос
                 $this->saveJobData($userId, $jobId);
                 $this->startPolling($userId, $chatId, $jobId, $userData['goal'], $userData['group']);
                 
@@ -260,17 +272,16 @@ class TelegramBotController extends Controller
         } catch (RequestException $e) {
             Log::error("Ошибка генерации плана для user {$userId}: " . $e->getMessage());
             Log::debug('Детали ошибки:', ['trace' => $e->getTraceAsString()]);
-            $this->clearJobData($userId); // Очистка состояния для возможности повтора
+            $this->clearJobData($userId);
             return "❌ Не удалось запустить генерацию плана: " . $e->getMessage() . ". Попробуйте снова.";
         }
 
-        $this->clearJobData($userId); // Очистка состояния при неожиданном ответе
+        $this->clearJobData($userId);
         return "❌ Не удалось запустить генерацию плана. Попробуйте позже.";
     }
 
-    private function startPolling(int $userId, int $chatId, string $jobId, string $goal, string $group)
+    private function startPolling(int $userId, int $chatId, string $jobId, string $goal, string $group): void
     {
-        // Проверка на существующий процесс опроса
         if (isset($this->activePolls[$userId])) {
             Log::warning("Опрос уже активен для user {$userId}. Пропускаем новый опрос.");
             return;
@@ -285,13 +296,12 @@ class TelegramBotController extends Controller
         $this->pollPlanResult($userId, $chatId, $jobId, $goal, $group);
     }
 
-    private function pollPlanResult(int $userId, int $chatId, string $jobId, string $goal, string $group)
+    private function pollPlanResult(int $userId, int $chatId, string $jobId, string $goal, string $group): void
     {
-        $maxTime = 100; // Максимальное время ожидания 100 секунд
-        $interval = 15; // Интервал опроса 15 секунд
+        $maxTime = 100;
+        $interval = 15;
         $startTime = $this->activePolls[$userId]['start_time'] ?? time();
 
-        // Проверка на превышение времени ожидания
         if ((time() - $startTime) >= $maxTime) {
             Log::warning("Превышено время ожидания (100 сек) для user {$userId}, job {$jobId}.");
             $this->sendMessage($chatId, "⌛ Время ожидания ответа истекло. Пожалуйста, попробуйте снова с помощью /GeneratePlan.");
@@ -300,7 +310,6 @@ class TelegramBotController extends Controller
             return;
         }
 
-        // Проверка на отмену или отсутствие активного опроса
         if (!isset($this->activePolls[$userId]) || $this->activePolls[$userId]['cancelled']) {
             Log::info("Опрос остановлен для user {$userId}: отменен или нет активного опроса.");
             unset($this->activePolls[$userId]);
@@ -312,7 +321,7 @@ class TelegramBotController extends Controller
             Log::debug("Опрос статуса для user {$userId}, job {$jobId}");
             $response = $this->client->get("{$this->plannerServiceUrl}/get-plan-result/{$jobId}", [
                 'headers' => ['Accept' => 'application/json'],
-                'timeout' => 30, // Короткий таймаут для опроса
+                'timeout' => 30,
             ]);
 
             $responseData = json_decode($response->getBody(), true);
@@ -335,7 +344,6 @@ class TelegramBotController extends Controller
                 return;
             }
 
-            // Продолжаем опрос
             sleep($interval);
             $this->pollPlanResult($userId, $chatId, $jobId, $goal, $group);
         } catch (RequestException $e) {
@@ -347,7 +355,10 @@ class TelegramBotController extends Controller
         }
     }
 
-    private function sendFormattedPlan(int $chatId, array $planData)
+    /**
+     * @param array{plan_title: string, estimated_duration_weeks: string, weekly_overview: array<array{week_number: int, weekly_goal: string, daily_tasks: array<array{day_name: string, learning_activities: array<array{topic: string, description: string, suggested_slot: string, estimated_duration_minutes: int, resources?: string[]}>}>, general_recommendations?: string} $planData
+     */
+    private function sendFormattedPlan(int $chatId, array $planData): void
     {
         $formatted = "📘 *{$planData['plan_title']}*\n";
         $formatted .= "⏳ Продолжительность: {$planData['estimated_duration_weeks']}\n\n";
@@ -389,7 +400,6 @@ class TelegramBotController extends Controller
         unset($this->activePolls[$userId]);
         $this->clearJobData($userId);
 
-        // Попытка отправить запрос на отмену задания внешнему сервису (если поддерживается)
         if ($jobId) {
             try {
                 $this->client->post("{$this->plannerServiceUrl}/cancel-plan/{$jobId}", [
@@ -400,7 +410,6 @@ class TelegramBotController extends Controller
             } catch (RequestException $e) {
                 Log::error("Ошибка при отправке запроса на отмену задания {$jobId} для user {$userId}: " . $e->getMessage());
                 Log::debug('Детали ошибки:', ['trace' => $e->getTraceAsString()]);
-                // Продолжаем, так как локальная отмена уже выполнена
             }
         }
 
@@ -415,7 +424,7 @@ class TelegramBotController extends Controller
         }
     }
 
-    private function validateToken()
+    private function validateToken(): void
     {
         if (empty($this->token) || !preg_match('/^\d+:[\w-]+$/', $this->token)) {
             Log::error('Некорректный токен Telegram');
@@ -423,35 +432,46 @@ class TelegramBotController extends Controller
         }
     }
 
-    private function sendMessage(int $chatId, string $text)
+    private function sendMessage(int $chatId, string $text): void
     {
         try {
-            $response = $this->client->post("https://api.telegram.org/bot{$this->token}/sendMessage", [
+            $this->client->post("https://api.telegram.org/bot{$this->token}/sendMessage", [
                 'form_params' => [
                     'chat_id' => $chatId,
                     'text' => $text,
                     'parse_mode' => 'Markdown'
                 ],
-                'timeout' => 10, // Короткий таймаут для отправки сообщений
+                'timeout' => 10,
             ]);
             Log::debug("Сообщение успешно отправлено в чат {$chatId}: {$text}");
         } catch (\Exception $e) {
             Log::error("Ошибка отправки сообщения в чат {$chatId}: " . $e->getMessage());
             Log::debug('Детали ошибки:', ['trace' => $e->getTraceAsString()]);
-            throw $e; // Перебрасываем исключение для обработки в вызывающем коде
+            throw $e;
         }
     }
 
-    private function setUserState(int $userId, array $state)
+    /**
+     * @param array{step?: string, timestamp?: int, pending_action?: string, missing_data?: string[], current_step?: int} $state
+     */
+    private function setUserState(int $userId, array $state): void
     {
         $states = Storage::exists('user_states.json') 
             ? json_decode(Storage::get('user_states.json'), true)
             : [];
         
         $states[$userId] = $state;
-        Storage::put('user_states.json', json_encode($states, JSON_PRETTY_PRINT));
+        $json = json_encode($states, JSON_PRETTY_PRINT);
+        if ($json === false) {
+            Log::error("Ошибка кодирования JSON для user_states: " . json_last_error_msg());
+            return;
+        }
+        Storage::put('user_states.json', $json);
     }
 
+    /**
+     * @return array{step?: string, timestamp?: int, pending_action?: string, missing_data?: string[], current_step?: int}
+     */
     private function getUserState(int $userId): array
     {
         if (!Storage::exists('user_states.json')) return [];
@@ -459,26 +479,42 @@ class TelegramBotController extends Controller
         return $states[$userId] ?? [];
     }
 
-    private function clearUserState(int $userId)
+    private function clearUserState(int $userId): void
     {
         $states = Storage::exists('user_states.json') 
             ? json_decode(Storage::get('user_states.json'), true)
             : [];
         
         unset($states[$userId]);
-        Storage::put('user_states.json', json_encode($states, JSON_PRETTY_PRINT));
+        $json = json_encode($states, JSON_PRETTY_PRINT);
+        if ($json === false) {
+            Log::error("Ошибка кодирования JSON для user_states: " . json_last_error_msg());
+            return;
+        }
+        Storage::put('user_states.json', $json);
     }
 
-    private function saveUserData(int $userId, array $data)
+    /**
+     * @param array{group?: string, goal?: string} $data
+     */
+    private function saveUserData(int $userId, array $data): void
     {
         $existing = Storage::exists('user_data.json') 
             ? json_decode(Storage::get('user_data.json'), true)
             : [];
         
         $existing[$userId] = array_merge($existing[$userId] ?? [], $data);
-        Storage::put('user_data.json', json_encode($existing, JSON_PRETTY_PRINT));
+        $json = json_encode($existing, JSON_PRETTY_PRINT);
+        if ($json === false) {
+            Log::error("Ошибка кодирования JSON для user_data: " . json_last_error_msg());
+            return;
+        }
+        Storage::put('user_data.json', $json);
     }
 
+    /**
+     * @return array{group?: string, goal?: string}
+     */
     private function getUserData(int $userId): array
     {
         if (!Storage::exists('user_data.json')) return [];
@@ -486,24 +522,34 @@ class TelegramBotController extends Controller
         return $data[$userId] ?? [];
     }
 
-    private function saveJobData(int $userId, string $jobId)
+    private function saveJobData(int $userId, string $jobId): void
     {
         $jobs = Storage::exists('user_jobs.json') 
             ? json_decode(Storage::get('user_jobs.json'), true)
             : [];
         
         $jobs[$userId] = $jobId;
-        Storage::put('user_jobs.json', json_encode($jobs, JSON_PRETTY_PRINT));
+        $json = json_encode($jobs, JSON_PRETTY_PRINT);
+        if ($json === false) {
+            Log::error("Ошибка кодирования JSON для user_jobs: " . json_last_error_msg());
+            return;
+        }
+        Storage::put('user_jobs.json', $json);
     }
 
-    private function clearJobData(int $userId)
+    private function clearJobData(int $userId): void
     {
         $jobs = Storage::exists('user_jobs.json') 
             ? json_decode(Storage::get('user_jobs.json'), true)
             : [];
         
         unset($jobs[$userId]);
-        Storage::put('user_jobs.json', json_encode($jobs, JSON_PRETTY_PRINT));
+        $json = json_encode($jobs, JSON_PRETTY_PRINT);
+        if ($json === false) {
+            Log::error("Ошибка кодирования JSON для user_jobs: " . json_last_error_msg());
+            return;
+        }
+        Storage::put('user_jobs.json', $json);
     }
 
     private function getJobData(int $userId): ?string
@@ -515,7 +561,7 @@ class TelegramBotController extends Controller
         return $jobs[$userId] ?? null;
     }
 
-    public function getUserDataEndpoint()
+    public function getUserDataEndpoint(): JsonResponse
     {
         return response()->json(
             Storage::exists('user_data.json') 
