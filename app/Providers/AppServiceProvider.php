@@ -13,18 +13,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->singleton(ScheduleService::class, function ($app) {
-            return new ScheduleService();
-        });
-
         $this->app->singleton(ScheduleParserService::class, function ($app) {
             return new ScheduleParserService();
         });
     }
 
-    /**
-     * Bootstrap any application services.
-     */
     public function boot(): void
     {
         //

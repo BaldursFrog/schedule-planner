@@ -10,7 +10,7 @@ class ScheduleController extends Controller
 {
     protected ScheduleParserService $scheduleParserService;
 
-    // Карта дней недели 
+    // Карта дней недели
     protected array $dayOrder = [
         1 => 'Понедельник',
         2 => 'Вторник',
@@ -31,7 +31,11 @@ class ScheduleController extends Controller
         $weekInfo = $this->scheduleParserService->getCurrentWeekInfo();
 
         if ($weekInfo === null) {
-            return response()->json(['message' => 'Не удалось определить текущую неделю. Возможно, семестр еще не начался или произошла ошибка.'], 500);
+            return response()->json(
+                ['message' => 'Не удалось определить текущую неделю. 
+                Возможно, семестр еще не начался или произошла ошибка.'],
+                500
+            );
         }
 
         return response()->json($weekInfo);
@@ -41,7 +45,7 @@ class ScheduleController extends Controller
     public function showSchedule(string $groupName): JsonResponse
     {
         $scheduleData = $this->scheduleParserService->getWeekSchedule($groupName);
-        $weekTypesMap = $this->scheduleParserService->getWeekTypesMap(); 
+        $weekTypesMap = $this->scheduleParserService->getWeekTypesMap();
 
         if (empty($scheduleData)) {
              Log::warning("Расписание для группы {$groupName} не найдено или произошла ошибка.");
@@ -65,7 +69,8 @@ class ScheduleController extends Controller
                              return $lesson;
                          }, $lessons);
                     } else {
-                         //Log::warning("Обнаружен неизвестный тип недели '{$weekTypeIndex}' для дня {$dayNumber}, группы {$groupName}");
+                         //Log::warning("Обнаружен неизвестный тип недели
+                         // '{$weekTypeIndex}' для дня {$dayNumber}, группы {$groupName}");
                     }
                 }
                 if (empty($formattedSchedule[$dayName])) {
@@ -81,11 +86,15 @@ class ScheduleController extends Controller
     public function getFreeTime(string $groupName): JsonResponse
     {
         $scheduleData = $this->scheduleParserService->getWeekSchedule($groupName);
-        $weekTypesMap = $this->scheduleParserService->getWeekTypesMap(); 
+        $weekTypesMap = $this->scheduleParserService->getWeekTypesMap();
 
         if (empty($scheduleData)) {
              Log::warning("Свободное время: Расписание для группы {$groupName} не найдено.");
-             return response()->json(['message' => 'Расписание не найдено для группы ' . $groupName . ', невозможно рассчитать свободное время.'], 404);
+             return response()->json(
+                 ['message' => 'Расписание не найдено для группы ' .
+                 $groupName . ', невозможно рассчитать свободное время.'],
+                 404
+             );
         }
 
         $formattedFreeTime = [];
@@ -103,22 +112,23 @@ class ScheduleController extends Controller
             if (isset($scheduleData[$dayNumber])) {
                  // Сортируем типы недель по индексу для консистентности вывода
                  ksort($scheduleData[$dayNumber]);
-                 foreach ($scheduleData[$dayNumber] as $weekTypeIndex => $lessons) {
-                     if (isset($weekTypesMap[$weekTypeIndex])) {
+                foreach ($scheduleData[$dayNumber] as $weekTypeIndex => $lessons) {
+                    if (isset($weekTypesMap[$weekTypeIndex])) {
                         $weekTypeName = $weekTypesMap[$weekTypeIndex];
-                        $freeSlots = $this->scheduleParserService->calculateFreeTimeSlots($lessons, $dayStartTime, $dayEndTime);
+                        $freeSlots = $this->scheduleParserService->
+                        calculateFreeTimeSlots($lessons, $dayStartTime, $dayEndTime);
                         $formattedFreeTime[$dayName][$weekTypeName] = $freeSlots;
                         $processedWeekTypes[$weekTypeIndex] = true; // Отмечаем тип недели как обработанный
                     }
-                 }
+                }
             }
 
-             foreach ($weekTypesMap as $weekTypeIndex => $weekTypeName) {
-                  if (!isset($processedWeekTypes[$weekTypeIndex])) {
-                       $freeSlots = $this->scheduleParserService->calculateFreeTimeSlots([], $dayStartTime, $dayEndTime);
-                       $formattedFreeTime[$dayName][$weekTypeName] = $freeSlots;
-                  }
-             }
+            foreach ($weekTypesMap as $weekTypeIndex => $weekTypeName) {
+                if (!isset($processedWeekTypes[$weekTypeIndex])) {
+                     $freeSlots = $this->scheduleParserService->calculateFreeTimeSlots([], $dayStartTime, $dayEndTime);
+                     $formattedFreeTime[$dayName][$weekTypeName] = $freeSlots;
+                }
+            }
         }
 
         return response()->json($formattedFreeTime);

@@ -11,8 +11,8 @@ class ScheduleParserService
 {
     protected Client $httpClient;
     protected string $scheduleApiUrl = 'https://www.miet.ru/schedule/data';
-    protected string $cacertPath = 'C:\Users\darin\Downloads\cacert.pem'; 
-    protected const SEMESTER_START_DATE = '2025-02-03'; 
+    protected string $cacertPath = 'C:\Users\darin\Downloads\cacert.pem';
+    protected const SEMESTER_START_DATE = '2025-02-03';
 
 
     protected array $weekTypesMap = [
@@ -26,7 +26,7 @@ class ScheduleParserService
     public function __construct()
     {
         $this->httpClient = new Client([
-            'verify' => $this->cacertPath, 
+            'verify' => $this->cacertPath,
             'timeout' => 10.0,
             'http_errors' => false,
         ]);
@@ -94,10 +94,11 @@ class ScheduleParserService
                 }
 
                 // Проверяем, что тип недели известен
-                 if (!array_key_exists($weekTypeIndex, $this->weekTypesMap)) {
-                    Log::warning("Обнаружен неизвестный индекс типа недели '{$weekTypeIndex}' в данных API: " . print_r($lessonData, true));
+                if (!array_key_exists($weekTypeIndex, $this->weekTypesMap)) {
+                    Log::warning("Обнаружен неизвестный индекс типа недели 
+                    '{$weekTypeIndex}' в данных API: " . print_r($lessonData, true));
                     continue;
-                 }
+                }
 
                 $timeFrom = substr($timeFromRaw, 11, 5);
                 $timeTo = substr($timeToRaw, 11, 5);
@@ -137,7 +138,6 @@ class ScheduleParserService
              unset($weekTypeLessons);
 
             return $lessonsByDayAndWeekType;
-
         } catch (Exception $e) {
             Log::error('Исключение при получении расписания для группы ' . $groupName . ': ' . $e->getMessage());
             return [];
@@ -180,7 +180,7 @@ class ScheduleParserService
                     'current_date' => $currentDate->toDateString(),
                     'semester_start' => $startDate->toDateString(),
                 ]);
-                return null; 
+                return null;
             }
 
             // Считаем количество полных недель, прошедших с начала семестра
@@ -209,7 +209,6 @@ class ScheduleParserService
                 'type_name' => $weekTypeName,        // Название ("1 числитель", ...)
                 //'semester_week_number' => $semesterWeekNumber // Номер недели с начала семестра (1, 2, 3...)
             ];
-
         } catch (Exception $e) {
             Log::error('Ошибка при расчете текущего типа недели: ' . $e->getMessage(), [
                 'semester_start' => self::SEMESTER_START_DATE
