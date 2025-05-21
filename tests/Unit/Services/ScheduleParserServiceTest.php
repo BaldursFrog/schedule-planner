@@ -3,12 +3,12 @@
 namespace Tests\Unit\Services;
 
 use App\Services\ScheduleParserService;
-use GuzzleHttp\Client as GuzzleClient; // Дадим алиас, чтобы не путать с нашим моком
+use GuzzleHttp\Client as GuzzleClient; 
 use PHPUnit\Framework\Attributes\Test;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamInterface;
 use Tests\TestCase;
-use Illuminate\Support\Facades\Log; // Для проверки логирования
+use Illuminate\Support\Facades\Log; 
 
 class ScheduleParserServiceTest extends TestCase
 {
@@ -20,11 +20,7 @@ class ScheduleParserServiceTest extends TestCase
         $this->scheduleParserService = new ScheduleParserService();
     }
 
-    // /**  // <<<--- УДАЛИ ИЛИ ЗАКОММЕНТИРУЙ СТАРЫЙ DOC-БЛОК С @test
-    //  * Тест для метода getWeekTypesMap.
-    //  * @test
-    //  */
-    #[Test] // <<<--- ДОБАВЬ АТРИБУТ ЗДЕСЬ
+    #[Test] 
     public function it_returns_correct_week_types_map(): void
     {
         $expectedMap = [
@@ -136,14 +132,14 @@ class ScheduleParserServiceTest extends TestCase
     {
         $lessons = [
             ['time_from' => '10:00', 'time_to' => '11:30'],
-            ['time_from' => '11:30', 'time_to' => '13:00'], // Занятие сразу после предыдущего
+            ['time_from' => '11:30', 'time_to' => '13:00'], 
         ];
         $dayStart = '09:00';
         $dayEnd = '18:00';
 
         $expectedFreeSlots = [
             ['from' => '09:00', 'to' => '10:00'],
-            ['from' => '13:00', 'to' => '18:00'], // Нет перерыва между 11:30 и 11:30
+            ['from' => '13:00', 'to' => '18:00'], 
         ];
 
         $actualFreeSlots = $this->scheduleParserService->calculateFreeTimeSlots($lessons, $dayStart, $dayEnd);
@@ -155,19 +151,15 @@ class ScheduleParserServiceTest extends TestCase
     public function calculateFreeTimeSlots_handles_lessons_outside_day_boundaries(): void
     {
         $lessons = [
-            ['time_from' => '07:00', 'time_to' => '08:30'], // Занятие до начала дня
+            ['time_from' => '07:00', 'time_to' => '08:30'], 
             ['time_from' => '10:00', 'time_to' => '11:30'],
-            ['time_from' => '17:30', 'time_to' => '19:00'], // Занятие после конца дня
+            ['time_from' => '17:30', 'time_to' => '19:00'], 
         ];
         $dayStart = '09:00';
         $dayEnd = '18:00';
 
-        // Ожидаем, что $lastBusyEndTime обновится до 08:30,
-        // затем первый слот будет с 09:00 (max($dayStart, $lastBusyEndTime)) до 10:00.
-        // Затем слот с 11:30 до 17:30.
-        // Последнее занятие заканчивается в 19:00, что больше $dayEnd, поэтому последнего слота не будет.
         $expectedFreeSlots = [
-            ['from' => '09:00', 'to' => '10:00'], // lastBusyEndTime было 08:30, но dayStart = 09:00
+            ['from' => '09:00', 'to' => '10:00'], 
             ['from' => '11:30', 'to' => '17:30'],
         ];
 
@@ -184,7 +176,7 @@ class ScheduleParserServiceTest extends TestCase
         $dayStart = '09:00';
         $dayEnd = '18:00';
 
-        $expectedFreeSlots = []; // Ожидаем пустой массив, так как нет свободного времени
+        $expectedFreeSlots = []; 
 
         $actualFreeSlots = $this->scheduleParserService->calculateFreeTimeSlots($lessons, $dayStart, $dayEnd);
 
@@ -194,10 +186,7 @@ class ScheduleParserServiceTest extends TestCase
       #[Test]
     public function getCurrentWeekInfo_returns_null_before_semester_starts(): void
     {
-        // Получаем сервис. Если ты решила не менять конструктор ScheduleParserService
-        // и оставила его создание в setUp(), то можно использовать $this->scheduleParserService
-        // Если ты удалила создание из setUp(), то создай его здесь:
-        $scheduleParserService = new \App\Services\ScheduleParserService(); // Или $this->scheduleParserService, если он инициализируется в setUp
+        $scheduleParserService = new \App\Services\ScheduleParserService(); 
 
         // Устанавливаем "фейковую" текущую дату ДО начала семестра
         // SEMESTER_START_DATE = '2025-02-03'
@@ -207,7 +196,7 @@ class ScheduleParserServiceTest extends TestCase
 
         $this->assertNull($result, "Должен возвращаться null, если семестр еще не начался.");
 
-        \Carbon\Carbon::setTestNow(); // Сбрасываем фейковую дату, чтобы не влиять на другие тесты
+        \Carbon\Carbon::setTestNow(); 
     }
 
     #[Test]
@@ -215,9 +204,8 @@ class ScheduleParserServiceTest extends TestCase
     {
         $scheduleParserService = new \App\Services\ScheduleParserService();
 
-        // SEMESTER_START_DATE = '2025-02-03' (понедельник)
-        // Это будет первая неделя, индекс типа недели 0 => "1 числитель"
-        \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2025-02-05')); // Среда первой недели
+       
+        \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2025-02-05')); 
 
         $result = $scheduleParserService->getCurrentWeekInfo();
 
@@ -233,15 +221,13 @@ class ScheduleParserServiceTest extends TestCase
     {
         $scheduleParserService = new \App\Services\ScheduleParserService();
 
-        // SEMESTER_START_DATE = '2025-02-03'
-        // 5-я неделя (weeksPassed = 4), индекс типа недели 4 % 4 = 0 => "1 числитель"
         \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2025-02-03')->addWeeks(4)->addDays(2)); // Среда пятой недели
 
         $result = $scheduleParserService->getCurrentWeekInfo();
 
         $this->assertIsArray($result);
         $this->assertArrayHasKey('type_name', $result);
-        $this->assertEquals('1 числитель', $result['type_name']); // Ожидаем снова "1 числитель" для 5-й недели (4-недельный цикл)
+        $this->assertEquals('1 числитель', $result['type_name']); 
 
         \Carbon\Carbon::setTestNow();
     }
@@ -251,8 +237,6 @@ class ScheduleParserServiceTest extends TestCase
     {
         $scheduleParserService = new \App\Services\ScheduleParserService();
 
-        // SEMESTER_START_DATE = '2025-02-03'
-        // 2-я неделя (weeksPassed = 1), индекс типа недели 1 % 4 = 1 => "1 знаменатель"
         \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2025-02-03')->addWeeks(1)->addDays(2)); // Среда второй недели
 
         $result = $scheduleParserService->getCurrentWeekInfo();
@@ -275,19 +259,18 @@ class ScheduleParserServiceTest extends TestCase
                     "DayNumber": 0,
                     "Time": {"TimeFrom": "2022-09-01T09:00:00", "TimeTo": "2022-09-01T10:30:00"},
                     "Class": {"Name": "Математика", "Teacher": "Иванов И.И."},
-                    "Room": {"Name": "А-101"}
+                    "Room": {"Name": "1201"}
                 },
                 {
                     "Day": 1,
                     "DayNumber": 0,
                     "Time": {"TimeFrom": "2022-09-01T10:40:00", "TimeTo": "2022-09-01T12:10:00"},
                     "Class": {"Name": "Физика", "Teacher": "Петров П.П."},
-                    "Room": {"Name": "Б-202"}
+                    "Room": {"Name": "1202"}
                 }
             ]
         }';
 
-        // Создаем моки для Response и Stream
         $mockStream = $this->createMock(StreamInterface::class);
         $mockStream->method('getContents')->willReturn($fakeApiResponseJson);
 
@@ -295,32 +278,26 @@ class ScheduleParserServiceTest extends TestCase
         $mockResponse->method('getStatusCode')->willReturn(200);
         $mockResponse->method('getBody')->willReturn($mockStream);
 
-        // Создаем мок для GuzzleHttp\Client
         $mockHttpClient = $this->createMock(GuzzleClient::class);
-        $mockHttpClient->expects($this->once()) // Ожидаем, что post будет вызван один раз
+        $mockHttpClient->expects($this->once())
             ->method('post')
-            // Можно добавить ->with(...) для проверки URL и параметров, если нужно точность
-            // Например: ->with('https://www.miet.ru/schedule/data', ['form_params' => ['group' => $groupName]])
             ->willReturn($mockResponse);
 
-        // Создаем экземпляр сервиса, передавая наш мок HttpClient
         $scheduleParserService = new ScheduleParserService($mockHttpClient);
 
-        // Вызываем тестируемый метод
         $result = $scheduleParserService->getWeekSchedule($groupName);
 
-        // Утверждения
         $this->assertIsArray($result);
         $this->assertNotEmpty($result);
-        $this->assertArrayHasKey(1, $result); // День 1
-        $this->assertArrayHasKey(0, $result[1]); // Тип недели 0
-        $this->assertCount(2, $result[1][0]); // 2 занятия
+        $this->assertArrayHasKey(1, $result); 
+        $this->assertArrayHasKey(0, $result[1]); 
+        $this->assertCount(2, $result[1][0]);
 
         $firstLesson = $result[1][0][0];
         $this->assertEquals('09:00', $firstLesson['time_from']);
         $this->assertEquals('Математика', $firstLesson['subject']);
         $this->assertEquals('Иванов И.И.', $firstLesson['teacher']);
-        $this->assertEquals('А-101', $firstLesson['room']);
+        $this->assertEquals('1201', $firstLesson['room']);
     }
 
       #[Test]
@@ -328,13 +305,10 @@ class ScheduleParserServiceTest extends TestCase
     {
         $groupName = 'НЕ_СУЩЕСТВУЮЩАЯ_ГРУППА';
 
-        // Создаем мок Response, который вернет статус 404
         $mockResponse = $this->createMock(ResponseInterface::class);
-        $mockResponse->method('getStatusCode')->willReturn(404); // API вернул ошибку
-        // getBody() в этом случае может не вызываться, или вернуть пустой стрим,
-        // но для надежности можно его тоже замокировать, если твой код пытается его читать
+        $mockResponse->method('getStatusCode')->willReturn(404);
         $mockStream = $this->createMock(StreamInterface::class);
-        $mockStream->method('getContents')->willReturn('{"Error": "Group not found"}'); // Пример тела ошибки от API
+        $mockStream->method('getContents')->willReturn('{"Error": "Group not found"}');
         $mockResponse->method('getBody')->willReturn($mockStream);
 
 
@@ -343,12 +317,6 @@ class ScheduleParserServiceTest extends TestCase
             ->method('post')
             ->willReturn($mockResponse);
 
-        // Используем фасад Log для проверки, что ошибка была залогирована
-        // Facade должен быть "шпионом" (spy) или моком, чтобы мы могли проверить вызовы.
-        // В Laravel тестах фасады по умолчанию "реальные", но мы можем их подменить.
-        // Для простоты, мы пока не будем проверять сам Log::error,
-        // а сфокусируемся на результате метода.
-        // Если захочешь проверять логи, нужно будет использовать Log::shouldReceive(...).
 
         $scheduleParserService = new ScheduleParserService($mockHttpClient);
 
