@@ -14,6 +14,9 @@ class TelegramBotController extends Controller
     private string $token;
     private Client $client;
     private string $plannerServiceUrl = 'https://1e046903-d28b-444d-bdff-685a9c37343a.tunnel4.com/api';
+    /**
+     * @var array<int, array{cancelled: bool, start_time: int, job_id: string}>
+     */
     private array $activePolls = [];
 
     public function __construct()
@@ -51,6 +54,9 @@ class TelegramBotController extends Controller
         return response()->json(['status' => 'success']);
     }
 
+    /**
+     * @param array{step?: string, timestamp?: int, pending_action?: string, missing_data?: string[], current_step?: int} $state
+     */
     private function handleUserInput(int $userId, int $chatId, string $text, int $messageTime): string
     {
         $state = $this->getUserState($userId);
@@ -60,7 +66,11 @@ class TelegramBotController extends Controller
                 return "⌛ Сообщение устарело. Пожалуйста, повторите ввод.";
             }
 
-            if (isset($state['pending_action']) && $state['pending_action'] === 'generate_plan') {
+            if (
+                isset($state['pending_action']) &&
+                $state['pending_action'] === 'generate_plan' &&
+                isset($state['missing_data'], $state['current_step'], $state['timestamp'])
+            ) {
                 return $this->handlePlanGenerationDataCollection($userId, $chatId, $text, $state);
             }
         }
@@ -85,7 +95,8 @@ class TelegramBotController extends Controller
                 return "📚 Введите номер вашей группы (например, ПИН-36):";
             
             case '/EnterGoal':
-                if (!$this->getUserData($userId)['group']) {
+                $userData = $this->getUserData($userId);
+                if (!isset($userData['group'])) {
                     return "⚠️ Сначала укажите группу через /EnterGroup";
                 }
                 $this->setUserState($userId, [
@@ -122,7 +133,7 @@ class TelegramBotController extends Controller
      */
     private function handleUserState(int $userId, string $text, ?array $state): string
     {
-        if (empty($state)) {
+        if (empty($state) || !isset($state['step'])) {
             return "❌ Неизвестная команда";
         }
 
@@ -135,7 +146,7 @@ class TelegramBotController extends Controller
             case 'waiting_for_goal':
                 $this->saveUserData($userId, ['goal' => $text]);
                 $this->clearUserState($userId);
-                $group = $this->getUserData($userId)['group'];
+                $group = $this->getUserData($userId)['group'] ?? 'Не указана';
                 return "✅ Цель сохранена!\nГруппа: {$group}\nЦель: {$text}";
             
             default:
@@ -166,8 +177,8 @@ class TelegramBotController extends Controller
     private function getMissingData(array $userData): array
     {
         $missing = [];
-        if (empty($userData['group'])) $missing[] = 'group';
-        if (empty($userData['goal'])) $missing[] = 'goal';
+        if (!isset($userData['group'])) $missing[] = 'group';
+        if (!isset($userData['goal'])) $missing[] = 'goal';
         return $missing;
     }
 
@@ -209,7 +220,11 @@ class TelegramBotController extends Controller
 
         if ($nextStep >= count($missing)) {
             $this->clearUserState($userId);
-            return $this->executePlanGeneration($userId, $chatId, $this->getUserData($userId));
+            $userData = $this->getUserData($userId);
+            if (!isset($userData['group'], $userData['goal'])) {
+                return "❌ Не удалось получить полные данные пользователя. Попробуйте снова.";
+            }
+            return $this->executePlanGeneration($userId, $chatId, $userData);
         }
 
         $this->setUserState($userId, [
@@ -349,14 +364,14 @@ class TelegramBotController extends Controller
         } catch (RequestException $e) {
             Log::error("Ошибка опроса для user {$userId}, job {$jobId}: " . $e->getMessage());
             Log::debug('Детали ошибки:', ['trace' => $e->getTraceAsString()]);
-            $this->sendMessage($chatId, "⚠️ Ошибка проверки статуса: " . $e->getMessage() . ". Попробуйте снова.");
+            $this->sendMessage($chatId, "⚠️ Ошибка проверки статусаameless: " . $e->getMessage() . ". Попробуйте снова.");
             unset($this->activePolls[$userId]);
             $this->clearJobData($userId);
         }
     }
 
     /**
-     * @param array{plan_title: string, estimated_duration_weeks: string, weekly_overview: array<array{week_number: int, weekly_goal: string, daily_tasks: array<array{day_name: string, learning_activities: array<array{topic: string, description: string, suggested_slot: string, estimated_duration_minutes: int, resources?: string[]}>}>, general_recommendations?: string} $planData
+     * @param array{plan_title: string, estimated_duration_weeks: string, weekly_overview: array<int, array{week_number: int, weekly_goal: string, daily_tasks: array<int, array{day_name: string, learning_activities: array<int, array{topic: string, description: string, suggested_slot: string, estimated_duration_minutes: int, resources?: array<int, string>}>}>, general_recommendations?: string} $planData
      */
     private function sendFormattedPlan(int $chatId, array $planData): void
     {
