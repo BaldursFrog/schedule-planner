@@ -3,12 +3,11 @@
 namespace Tests\Unit\Services;
 
 use App\Services\ScheduleParserService;
-use GuzzleHttp\Client as GuzzleClient; 
+use GuzzleHttp\Client as GuzzleClient;
 use PHPUnit\Framework\Attributes\Test;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamInterface;
 use Tests\TestCase;
-use Illuminate\Support\Facades\Log; 
 
 class ScheduleParserServiceTest extends TestCase
 {
@@ -20,7 +19,7 @@ class ScheduleParserServiceTest extends TestCase
         $this->scheduleParserService = new ScheduleParserService();
     }
 
-    #[Test] 
+    #[Test]
     public function it_returns_correct_week_types_map(): void
     {
         $expectedMap = [
@@ -32,7 +31,7 @@ class ScheduleParserServiceTest extends TestCase
 
         $actualMap = $this->scheduleParserService->getWeekTypesMap();
 
-        $this->assertEquals($expectedMap, $actualMap, "Метод getWeekTypesMap должен возвращать корректную карту типов недель.");
+        $this->assertEquals($expectedMap, $actualMap, 'Метод getWeekTypesMap должен возвращать корректную карту типов недель.');
     }
 
     #[Test]
@@ -132,14 +131,14 @@ class ScheduleParserServiceTest extends TestCase
     {
         $lessons = [
             ['time_from' => '10:00', 'time_to' => '11:30'],
-            ['time_from' => '11:30', 'time_to' => '13:00'], 
+            ['time_from' => '11:30', 'time_to' => '13:00'],
         ];
         $dayStart = '09:00';
         $dayEnd = '18:00';
 
         $expectedFreeSlots = [
             ['from' => '09:00', 'to' => '10:00'],
-            ['from' => '13:00', 'to' => '18:00'], 
+            ['from' => '13:00', 'to' => '18:00'],
         ];
 
         $actualFreeSlots = $this->scheduleParserService->calculateFreeTimeSlots($lessons, $dayStart, $dayEnd);
@@ -151,15 +150,15 @@ class ScheduleParserServiceTest extends TestCase
     public function calculateFreeTimeSlots_handles_lessons_outside_day_boundaries(): void
     {
         $lessons = [
-            ['time_from' => '07:00', 'time_to' => '08:30'], 
+            ['time_from' => '07:00', 'time_to' => '08:30'],
             ['time_from' => '10:00', 'time_to' => '11:30'],
-            ['time_from' => '17:30', 'time_to' => '19:00'], 
+            ['time_from' => '17:30', 'time_to' => '19:00'],
         ];
         $dayStart = '09:00';
         $dayEnd = '18:00';
 
         $expectedFreeSlots = [
-            ['from' => '09:00', 'to' => '10:00'], 
+            ['from' => '09:00', 'to' => '10:00'],
             ['from' => '11:30', 'to' => '17:30'],
         ];
 
@@ -176,17 +175,17 @@ class ScheduleParserServiceTest extends TestCase
         $dayStart = '09:00';
         $dayEnd = '18:00';
 
-        $expectedFreeSlots = []; 
+        $expectedFreeSlots = [];
 
         $actualFreeSlots = $this->scheduleParserService->calculateFreeTimeSlots($lessons, $dayStart, $dayEnd);
 
         $this->assertEquals($expectedFreeSlots, $actualFreeSlots);
     }
 
-      #[Test]
+    #[Test]
     public function getCurrentWeekInfo_returns_null_before_semester_starts(): void
     {
-        $scheduleParserService = new \App\Services\ScheduleParserService(); 
+        $scheduleParserService = new \App\Services\ScheduleParserService();
 
         // Устанавливаем "фейковую" текущую дату ДО начала семестра
         // SEMESTER_START_DATE = '2025-02-03'
@@ -194,9 +193,9 @@ class ScheduleParserServiceTest extends TestCase
 
         $result = $scheduleParserService->getCurrentWeekInfo();
 
-        $this->assertNull($result, "Должен возвращаться null, если семестр еще не начался.");
+        $this->assertNull($result, 'Должен возвращаться null, если семестр еще не начался.');
 
-        \Carbon\Carbon::setTestNow(); 
+        \Carbon\Carbon::setTestNow();
     }
 
     #[Test]
@@ -204,8 +203,7 @@ class ScheduleParserServiceTest extends TestCase
     {
         $scheduleParserService = new \App\Services\ScheduleParserService();
 
-       
-        \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2025-02-05')); 
+        \Carbon\Carbon::setTestNow(\Carbon\Carbon::parse('2025-02-05'));
 
         $result = $scheduleParserService->getCurrentWeekInfo();
 
@@ -227,7 +225,7 @@ class ScheduleParserServiceTest extends TestCase
 
         $this->assertIsArray($result);
         $this->assertArrayHasKey('type_name', $result);
-        $this->assertEquals('1 числитель', $result['type_name']); 
+        $this->assertEquals('1 числитель', $result['type_name']);
 
         \Carbon\Carbon::setTestNow();
     }
@@ -248,7 +246,7 @@ class ScheduleParserServiceTest extends TestCase
         \Carbon\Carbon::setTestNow();
     }
 
-     #[Test]
+    #[Test]
     public function getWeekSchedule_returns_parsed_schedule_on_successful_api_response(): void
     {
         $groupName = 'ЭКТ-11';
@@ -289,8 +287,8 @@ class ScheduleParserServiceTest extends TestCase
 
         $this->assertIsArray($result);
         $this->assertNotEmpty($result);
-        $this->assertArrayHasKey(1, $result); 
-        $this->assertArrayHasKey(0, $result[1]); 
+        $this->assertArrayHasKey(1, $result);
+        $this->assertArrayHasKey(0, $result[1]);
         $this->assertCount(2, $result[1][0]);
 
         $firstLesson = $result[1][0][0];
@@ -300,7 +298,7 @@ class ScheduleParserServiceTest extends TestCase
         $this->assertEquals('1201', $firstLesson['room']);
     }
 
-      #[Test]
+    #[Test]
     public function getWeekSchedule_returns_empty_array_when_api_returns_error_status_code(): void
     {
         $groupName = 'НЕ_СУЩЕСТВУЮЩАЯ_ГРУППА';
@@ -311,18 +309,16 @@ class ScheduleParserServiceTest extends TestCase
         $mockStream->method('getContents')->willReturn('{"Error": "Group not found"}');
         $mockResponse->method('getBody')->willReturn($mockStream);
 
-
         $mockHttpClient = $this->createMock(GuzzleClient::class);
         $mockHttpClient->expects($this->once())
             ->method('post')
             ->willReturn($mockResponse);
-
 
         $scheduleParserService = new ScheduleParserService($mockHttpClient);
 
         $result = $scheduleParserService->getWeekSchedule($groupName);
 
         $this->assertIsArray($result);
-        $this->assertEmpty($result, "Метод должен вернуть пустой массив при ошибке API.");
+        $this->assertEmpty($result, 'Метод должен вернуть пустой массив при ошибке API.');
     }
 }

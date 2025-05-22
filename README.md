@@ -1,68 +1,174 @@
-<<<<<<< HEAD
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# API Расписания МИЭТ
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Этот проект представляет собой API для получения актуального расписания занятий и информации о свободном времени для студентов МИЭТ, используя данные с официального сайта.
 
-## About Laravel
+## Требования
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- Docker
+- Docker Compose
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Установка и запуск
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+1.  **Клонируйте репозиторий:**
+    ```bash
+    git clone <URL_вашего_репозитория>
+    cd miet-schedule
+    ```
 
-## Learning Laravel
+2.  **Создайте файл окружения:**
+    Скопируйте `.env.example` в `.env`:
+    ```bash
+    cp .env.example .env
+    ```
+    *Убедитесь, что в `.env` переменные `SESSION_DRIVER`, `CACHE_STORE` и `QUEUE_CONNECTION` установлены в `file` или `sync`, так как проект на данный момент не использует базу данных.*
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+3.  **Сгенерируйте ключ приложения Laravel (если это не было сделано автоматически при создании `.env`):**
+    Эта команда выполняется внутри контейнера `app` после его первого запуска.
+    ```bash
+    docker-compose exec app php artisan key:generate
+    ```
+    *Примечание: Если вы запускаете проект впервые, ключ может быть уже сгенерирован при установке зависимостей Laravel, если настроен `post-create-project-cmd`.*
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+4.  **Соберите и запустите Docker-контейнеры:**
+    ```bash
+    docker-compose up -d --build
+    ```
+    *   Флаг `--build` нужен при первом запуске или если вы вносили изменения в `Dockerfile`.
+    *   Флаг `-d` запускает контейнеры в фоновом (detached) режиме.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+5.  **Приложение будет доступно по адресу:**
+    [http://localhost:8000](http://localhost:8000) (если в `docker-compose.yml` порт `8000:80` для nginx).
 
-## Laravel Sponsors
+## Описание API эндпоинтов
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+### 1. Получение информации о текущей учебной неделе
 
-### Premium Partners
+-   **Метод:** `GET`
+-   **URL:** `/current-week`
+-   **Описание:** Возвращает тип текущей учебной недели (например, "1 числитель").
+-   **Параметры запроса:** Нет.
+-   **Пример успешного ответа (200 OK):**
+    ```json
+    {
+        "type_name": "1 числитель"
+    }
+    ```
+-   **Возможные ошибки:**
+    -   `500 Internal Server Error` (или другой статус): Если не удалось определить неделю (например, семестр не начался).
+        ```json
+        {
+            "message": "Не удалось определить текущую неделю. Возможно, семестр еще не начался или произошла ошибка."
+        }
+        ```
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+### 2. Получение расписания занятий для группы
 
-## Contributing
+-   **Метод:** `GET`
+-   **URL:** `/schedule/{groupName}`
+-   **Описание:** Возвращает расписание занятий для указанной группы на все типы недель.
+-   **Параметры URL:**
+    -   `groupName` (string, required): Название группы (например, "ЭКТ-11").
+-   **Пример успешного ответа (200 OK):**
+    ```json
+    {
+        "Понедельник": {
+            "1 числитель": [
+                {
+                    "time_from": "09:00",
+                    "time_to": "10:30",
+                    "subject": "Математика"
+                },
+                // ... другие пары
+            ],
+            "1 знаменатель": [
+                // ... пары для знаменателя
+            ]
+        },
+        "Вторник": {
+            // ...
+        }
+        // ... и так далее для других дней
+    }
+    ```
+-   **Возможные ошибки:**
+    -   `404 Not Found`: Если расписание для указанной группы не найдено.
+        ```json
+        {
+            "message": "Расписание не найдено для группы ЭКТ-11"
+        }
+        ```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### 3. Получение свободного времени для группы
 
-## Code of Conduct
+-   **Метод:** `GET`
+-   **URL:** `/free-time/{groupName}`
+-   **Описание:** Рассчитывает и возвращает свободные временные слоты для указанной группы на все типы недель.
+-   **Параметры URL:**
+    -   `groupName` (string, required): Название группы.
+-   **Пример успешного ответа (200 OK):**
+    ```json
+    {
+        "Понедельник": {
+            "1 числитель": [
+                { "from": "08:00", "to": "09:00" },
+                { "from": "10:30", "to": "12:00" },
+                // ... другие свободные слоты
+                { "from": "15:00", "to": "20:00" }
+            ],
+            "1 знаменатель": [
+                // ... свободные слоты для знаменателя
+            ]
+        },
+        "Вторник": {
+            // ...
+        }
+        // ... и так далее для других дней
+    }
+    ```
+-   **Возможные ошибки:**
+    -   `404 Not Found`: Если расписание для группы не найдено (и, следовательно, свободное время рассчитать невозможно).
+        ```json
+        {
+            "message": "Расписание не найдено для группы ЭКТ-11, невозможно рассчитать свободное время."
+        }
+        ```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## Запуск тестов
 
-## Security Vulnerabilities
+Для запуска всех тестов (Unit):
+```bash
+php artisan test
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Инструменты для качества кода
+В проекте настроены следующие инструменты для поддержания качества кода:
 
-## License
+Статический анализ кода (PHPStan):
+Для проверки кода на потенциальные ошибки без его выполнения.
+```bash
+composer analyse
+```
+Проверка стиля кода (PHP_CodeSniffer):
+Для проверки соответствия кода стандарту PSR-12.
+```bash
+composer cs-check
+```
+Автоматическое форматирование кода (PHP-CS-Fixer):
+Посмотреть предлагаемые изменения (без реального исправления файлов):
+```bash
+composer format-check
+```
+Применить автоматическое форматирование к файлам проекта:
+```bash
+composer format-apply
+```
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
 
+## Git Hooks
+В проекте настроен pre-commit хук. Перед каждым коммитом автоматически запускаются:
+
+PHPStan (composer analyse)
+PHP_CodeSniffer (composer cs-check)
+PHPUnit тесты (composer test)
+
+Если какая-либо из этих проверок не проходит, коммит будет отменен до тех пор, пока ошибки не будут исправлены. Это помогает поддерживать высокое качество кода в репозитории.
